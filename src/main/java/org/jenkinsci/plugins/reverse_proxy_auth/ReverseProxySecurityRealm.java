@@ -26,6 +26,7 @@ package org.jenkinsci.plugins.reverse_proxy_auth;
 import hudson.Extension;
 import hudson.model.Descriptor;
 import hudson.model.Hudson;
+import hudson.security.UserMayOrMayNotExistException;
 import hudson.security.SecurityRealm;
 
 import java.io.IOException;
@@ -155,13 +156,14 @@ public class ReverseProxySecurityRealm extends SecurityRealm {
             }
         }, new UserDetailsService() {
             public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
-                throw new UsernameNotFoundException(username);
+                throw new UserMayOrMayNotExistException(username);
             }
         });
     }
 
     @Extension
     public static class DescriptorImpl extends Descriptor<SecurityRealm> {
+        @Override
         public String getDisplayName() {
             return Messages.ReverseProxySecurityRealm_DisplayName();
         }
