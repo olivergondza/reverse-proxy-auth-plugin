@@ -30,6 +30,9 @@ import hudson.security.UserMayOrMayNotExistException;
 import hudson.security.SecurityRealm;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -56,6 +59,8 @@ import org.springframework.dao.DataAccessException;
  * @author Kohsuke Kawaguchi
  */
 public class ReverseProxySecurityRealm extends SecurityRealm {
+
+    private static final Logger LOGGER = Logger.getLogger(ReverseProxySecurityRealm.class.getName());
     
     private static final String REMOTE_USER_HEADER = "REMOTE_USER";
     
@@ -124,13 +129,29 @@ public class ReverseProxySecurityRealm extends SecurityRealm {
 
             public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
                 HttpServletRequest r = (HttpServletRequest) request;
-                
+
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    StringBuilder sb = new StringBuilder("Incoming Request {\n")
+                            .append("\tMethod ").append(r.getMethod()).append("\n")
+                            .append("\tRemote User:").append(r.getRemoteUser()).append("\n");
+                    for (Object name : Collections.list(r.getHeaderNames())) {
+                        for (Object value : Collections.list(r.getHeaders((String) name))) {
+                            sb.append("\t").append(name).append(": ").append(value).append("\n");
+                        }
+                    }
+                    sb.append("}\n");
+                    log(sb.toString());
+                }
+
                 String v;
-                if(remoteUserHeader)
+                if (remoteUserHeader) {
                     v = r.getRemoteUser();
-                else
+                } else {
+                    log("Using custom header: " + header);
                     v = r.getHeader(header);
-                
+                }
+
+                log("Propagated user: " + v);
                 Authentication a;
                 if (v==null) {
                     a = Hudson.ANONYMOUS;
@@ -138,9 +159,15 @@ public class ReverseProxySecurityRealm extends SecurityRealm {
                     a = new UsernamePasswordAuthenticationToken(v,"",new GrantedAuthority[]{SecurityRealm.AUTHENTICATED_AUTHORITY});
                 }
 
+                log("Authentication: " + a);
+
                 SecurityContextHolder.getContext().setAuthentication(a);
 
                 chain.doFilter(request,response);
+            }
+
+            private void log(String msg) {
+                LOGGER.fine(msg);
             }
 
             public void destroy() {
